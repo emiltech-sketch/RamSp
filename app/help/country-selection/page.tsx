@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Check } from "lucide-react"
 import Link from "next/link"
@@ -9,6 +9,14 @@ import { Input } from "@/components/ui/input"
 export default function CountrySelectionPage() {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null)
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+    const saved = localStorage.getItem("selectedCountry")
+    setSelectedCountry(saved)
+  }, [])
 
   // Complete list of countries in alphabetical order
   const countries = [
@@ -214,8 +222,8 @@ export default function CountrySelectionPage() {
   )
 
   const handleSelectCountry = (country: string) => {
-    // In a real app, this would save the country preference
     localStorage.setItem("selectedCountry", country)
+    setSelectedCountry(country)
     router.push("/help")
   }
 
@@ -254,7 +262,7 @@ export default function CountrySelectionPage() {
                 <span className="text-xl mr-3">{country.flag}</span>
                 <span>{country.name}</span>
               </div>
-              {localStorage.getItem("selectedCountry") === country.name && <Check className="h-5 w-5 text-[#40E0D0]" />}
+              {selectedCountry === country.name && isClient && <Check className="h-5 w-5 text-[#40E0D0]" />}
             </button>
           ))}
         </div>
