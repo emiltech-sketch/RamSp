@@ -1,14 +1,13 @@
-"use client"
+use client
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Eye, EyeOff } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
+import { supabase } from "@/lib/supabaseClient"
 
 interface SignInScreenProps {
   onSignIn?: (username: string) => void
@@ -27,7 +26,6 @@ export default function SignInScreen({ onSignIn, onSkip }: SignInScreenProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [isClient, setIsClient] = useState(false)
 
-  // Ensure we're on the client side
   useEffect(() => {
     setIsClient(true)
   }, [])
@@ -36,71 +34,61 @@ export default function SignInScreen({ onSignIn, onSkip }: SignInScreenProps) {
     e.preventDefault()
     setError(null)
     setLoading(true)
-
     try {
       if (isSignUp) {
-        // Validate form
-        if (!emailOrPhone || !password || !username || !confirmPassword) {
+        if (!emailOrPhone || !password || !username || !confirmPassword)
           throw new Error("All fields are required")
-        }
-
-        if (password !== confirmPassword) {
+        if (password !== confirmPassword)
           throw new Error("Passwords do not match")
-        }
-
-        // Store user info in localStorage
+        // Supabase sign-up
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email: emailOrPhone,
+          password,
+          options: { data: { username } }
+        })
+        if (signUpError) throw signUpError
         localStorage.setItem("isLoggedIn", "true")
         localStorage.setItem("username", username)
         localStorage.setItem("userEmail", emailOrPhone)
-
-        // Redirect or callback
-        if (onSignIn) {
-          onSignIn(username)
-        } else {
-          router.push("/")
-        }
+        if (onSignIn) onSignIn(username)
+        else router.push("/")
       } else {
-        // Validate form
-        if (!emailOrPhone || !password) {
+        if (!emailOrPhone || !password)
           throw new Error("Email/phone and password are required")
-        }
-
-        // Store user info in localStorage
-        const displayName = username || (emailOrPhone.includes("@") ? emailOrPhone.split("@")[0] : emailOrPhone)
+        // Supabase sign-in
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email: emailOrPhone,
+          password
+        })
+        if (signInError) throw signInError
+        const displayName =
+          username ||
+          (emailOrPhone.includes("@") ? emailOrPhone.split("@")[0] : emailOrPhone)
         localStorage.setItem("isLoggedIn", "true")
         localStorage.setItem("username", displayName)
         localStorage.setItem("userEmail", emailOrPhone)
-
-        // Redirect or callback
-        if (onSignIn) {
-          onSignIn(displayName)
-        } else {
-          router.push("/")
-        }
+        if (onSignIn) onSignIn(displayName)
+        else router.push("/")
       }
     } catch (err: any) {
-      setError(err.message)
+      setError(err?.message || "An error occurred")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSocialSignIn = (provider: "google" | "apple" | "facebook") => {
+  const handleSocialSignIn = async (provider: "google" | "apple" | "facebook") => {
     setError(null)
     setLoading(true)
-
     try {
-      // Mock social authentication
-      const displayName = provider === "google" ? "Google User" : provider === "apple" ? "Apple User" : "Facebook User"
-      localStorage.setItem("isLoggedIn", "true")
-      localStorage.setItem("username", displayName)
-
-      // Redirect or callback
-      if (onSignIn) {
-        onSignIn(displayName)
-      } else {
-        router.push("/")
-      }
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: typeof window !== "undefined" ? window.location.origin + "/" : "/"
+        }
+      })
+      if (oauthError) throw oauthError
+      // Supabase will handle the redirect; localStorage is updated post-login callback
     } catch (error: any) {
       setError("Authentication failed. Please try again.")
     } finally {
@@ -109,14 +97,10 @@ export default function SignInScreen({ onSignIn, onSkip }: SignInScreenProps) {
   }
 
   const handleSkip = () => {
-    if (onSkip) {
-      onSkip("Guest User")
-    } else {
-      router.push("/")
-    }
+    if (onSkip) onSkip("Guest User")
+    else router.push("/")
   }
 
-  // Don't render anything until we're on the client side
   if (!isClient) {
     return (
       <div className="min-h-screen bg-white flex flex-col justify-center items-center">
@@ -159,12 +143,12 @@ export default function SignInScreen({ onSignIn, onSkip }: SignInScreenProps) {
 
           <div>
             <label htmlFor="emailOrPhone" className="block text-sm font-medium text-gray-700 mb-1">
-              Email/Phone
+              Email
             </label>
             <Input
               id="emailOrPhone"
-              type="text"
-              placeholder="Enter your email or phone number"
+              type="email"
+              placeholder="Enter your email"
               value={emailOrPhone}
               onChange={(e) => setEmailOrPhone(e.target.value)}
             />
@@ -246,7 +230,7 @@ export default function SignInScreen({ onSignIn, onSkip }: SignInScreenProps) {
           </div>
         </div>
 
-        {/* Social login buttons - Vertical layout */}
+        {/* Social login buttons */}
         <div className="mt-6 flex flex-col space-y-3">
           <Button
             variant="outline"
